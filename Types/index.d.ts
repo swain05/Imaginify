@@ -28,7 +28,7 @@ declare type CreateUserParams = {
       config: any;
       secureURL: string;
       transformationURL: string;
-      aspectRatio: string | undefined;
+      aspectRation: string | undefined;
       prompt: string | undefined;
       color: string | undefined;
     };

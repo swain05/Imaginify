@@ -6,6 +6,7 @@ import { handleError } from "../utils";
 import User from "../database/models/user.model";
 import Image from "../database/models/image.model";
 import { redirect } from "next/navigation";
+import {v2 as cloudinary } from 'cloudinary';
 
 
 
@@ -33,7 +34,7 @@ export async function addImage({image, userId, path}:AddImageParams){
             author:author._id,
         })
         revalidatePath(path);
-
+        console.log("Image loaded successfully");
         return JSON.parse(JSON.stringify(newImage));
     }catch(error){
         handleError(error)
@@ -97,3 +98,56 @@ export async function getImageById(imageId:string){
         handleError(error)
     }
 }
+
+//Get Images
+export async function getAllImages({ limit = 9, page = 1, searchQuery = '' }: {
+    limit?: number;
+    page: number;
+    searchQuery?: string;
+  }) {
+    try {
+        await connectToDatabse();
+        let query = {};
+      cloudinary.config({
+        cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true,
+      })
+  
+      let expression = 'folder=imaginify';
+  
+      if (searchQuery) {
+        expression += ` AND ${searchQuery}`
+      }
+  
+      const { resources } = await cloudinary.search.expression(expression).execute();
+      const resourceIds = resources.map((resource: any) => resource.public_id);
+      
+      
+      console.log(JSON.stringify(resourceIds));
+      if(searchQuery) {
+        query = {
+            publicId: {
+            $in: resourceIds
+          }
+        }
+      }
+  
+      const skipAmount = (Number(page) -1) * limit;
+  
+      const images = await populateUser(Image.find(query)).sort({ updatedAt: -1 }).skip(skipAmount).limit(limit);
+      
+      console.log("JSON"+JSON.stringify(query));
+      const totalImages = await Image.find(query).countDocuments();
+      const savedImages = await Image.find().countDocuments();
+
+      return {
+        data: JSON.parse(JSON.stringify(images)),
+        totalPage: Math.ceil(totalImages / limit),
+        savedImages,
+      }
+    } catch (error) {
+      handleError(error)
+    }
+  }
